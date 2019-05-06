@@ -1,0 +1,46 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.3'
+    }
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+repositories {
+    mavenCentral()
+}
+
+group = 'com.fairysupport'
+version = '1.2.0-SNAPSHOT'
+sourceCompatibility = 7
+targetCompatibility = 7
+
+dependencies {
+    compile group: 'com.jcraft', name: 'jsch', version: '0.1.54'
+    compile group: 'commons-net', name: 'commons-net', version: '3.6'
+    compile group: 'commons-beanutils', name: 'commons-beanutils', version: '1.9.3'
+    testCompile 'junit:junit:4.11'
+}
+
+eclipse.classpath.file.whenMerged {
+
+	entries.find { it.path == 'src/main/java' }.output = 'bin/main'
+	entries.find { it.path == 'src/main/resources' }.output = 'bin/main'
+	entries.find { it.path == 'src/test/java' }.output = 'bin/main'
+	entries.find { it.path == 'src/test/resources' }.output = 'bin/main'
+
+}
+
+shadowJar {
+  manifest {
+        attributes 'Main-Class': 'com.fairysupport.run.App'
+  }
+   baseName = 'com_fairysupport_run'
+   classifier = null
+   version = null
+}

@@ -1,0 +1,2 @@
+sample1 arg1 arg2 -f server1.properties
+sample2 -f server2.properties

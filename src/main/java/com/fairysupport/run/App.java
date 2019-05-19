@@ -91,7 +91,11 @@ public class App {
 				} else if ("-i".equals(arg) && (i + 1) < rawArgs.length) {
 
 					String importFileName = rawArgs[i + 1];
-					String importFilePath = (new File(this.currentDir, importFileName)).getCanonicalFile().getCanonicalPath();
+					File importFile = new File(this.currentDir, importFileName);
+					if (!importFile.exists()) {
+						throw new RuntimeException("not found " + importFile.getAbsolutePath());
+					}
+					String importFilePath = importFile.getCanonicalFile().getCanonicalPath();
 					BufferedReader reader = new BufferedReader(new FileReader(importFilePath));
 					String line = null;
 					while ((line = reader.readLine()) != null) {
@@ -111,7 +115,7 @@ public class App {
 			
 			String[] args = argList.toArray(new String[argList.size()]);
 
-			this.validate(args);
+			this.validate(args, propFileNameList);
 
 			arg = null;
 			if (args.length > 1) {
@@ -250,8 +254,10 @@ public class App {
 
 	}
 
-	private void validate(String[] args) {
+	private void validate(String[] args, List<String> propFileNameList) {
 
+		BufferedReader reader = null;
+		
 		try {
 
 			this.mainDirName = args[0];
@@ -268,8 +274,35 @@ public class App {
 				throw new RuntimeException("not found main.sh " + mainSh.getAbsolutePath());
 			}
 
+			for (String propFileName : propFileNameList) {
+				File propFile = new File(this.currentDir, propFileName);
+				if (!propFile.exists()) {
+					throw new RuntimeException("not found " + propFileName);
+				}
+			}
+
+			File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
+			if (includeListFile.isFile()) {
+				reader = new BufferedReader(new FileReader(includeListFile));
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					File includeFile = new File(this.currentDir, line.trim());
+					if (!includeFile.exists()) {
+						throw new RuntimeException("not found " + includeFile.getAbsolutePath());
+					}
+				}
+			}
+
 		} catch (Exception e) {
 			throw new RuntimeException(e);
+		} finally {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
 		}
 
 	}

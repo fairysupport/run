@@ -2,6 +2,8 @@ package com.fairysupport.run;
 
 public class Conf {
 
+	private String file;
+	private String server;
 	private String user;
 	private String password;
 	private String passphrase;
@@ -9,6 +11,18 @@ public class Conf {
 	private String address;
 	private String port;
 
+	public String getFile() {
+		return file;
+	}
+	public void setFile(String file) {
+		this.file = file;
+	}
+	public String getServer() {
+		return server;
+	}
+	public void setServer(String server) {
+		this.server = server;
+	}
 	public String getUser() {
 		return user;
 	}

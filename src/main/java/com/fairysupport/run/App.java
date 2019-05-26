@@ -33,11 +33,15 @@ public class App {
 
 	private static final String MAIN_SH = "main.sh";
 	private static final String INCLUDE_LIST_FILE = "include.txt";
+	private static final String GET_LIST_FILE = "get.txt";
 	private static final String ROOT_DIR = "com_fairysupport_run";
 
+	private static final int RETRY = 3;
+	
 	protected String currentDir;
 	private String mainDirName;
 	private String mainShArg;
+	private String[] fmtArgs;
 	private static final String PROP_FILE_NAME = "server.properties";
 
 	private Map<String, Integer> srvMap = new HashMap<>();
@@ -51,7 +55,7 @@ public class App {
 	public App(String currentDir, String[] rawArgs) {
 		
 		try {
-
+			
 			this.init();
 
 			if (this.in == null) {
@@ -113,16 +117,18 @@ public class App {
 				propFileNameList.add(PROP_FILE_NAME);
 			}
 			
-			String[] args = argList.toArray(new String[argList.size()]);
+			this.fmtArgs = argList.toArray(new String[argList.size()]);
 
-			this.validate(args, propFileNameList);
+			this.validate(propFileNameList);
 
 			arg = null;
-			if (args.length > 1) {
+			if (this.fmtArgs.length > 1) {
 				StringBuilder argSb = new StringBuilder();
-				for (int i = 1; i < args.length; i++) {
-					arg = args[i];
+				for (int i = 1; i < this.fmtArgs.length; i++) {
+					arg = this.fmtArgs[i];
+					argSb.append("\"");
 					argSb.append(arg);
+					argSb.append("\"");
 					argSb.append(" ");
 				}
 				argSb.delete(argSb.length() -1, argSb.length());
@@ -152,7 +158,10 @@ public class App {
 					}
 					serverName = propFileName + "." + strKeySplit[0];
 					if (!srvMap.containsKey(serverName)) {
-						srvList.add(new Conf());
+						Conf addConf = new Conf();
+						addConf.setFile(propFileName);
+						addConf.setServer(strKeySplit[0]);
+						srvList.add(addConf);
 						srvMap.put(serverName, srvList.size() - 1);
 					}
 	
@@ -175,6 +184,53 @@ public class App {
 		App.dispatch(args, null, false, App.class);
 		System.exit(0);
 	}
+	
+	private static String[] stringToArray(String runArg) {
+
+		String[] runArgArray = runArg.split(" ");
+		
+		String[] useArgs = null;
+		
+		List<String> inputArgsList = new ArrayList<String>();
+		String runArgSplit = null;
+		for (int i = 0; i < runArgArray.length; i++) {
+			runArgSplit = runArgArray[i];
+			if ("".equals(runArgSplit)) {
+				continue;
+			}
+			String userArg = runArgSplit;
+			
+			if (runArgSplit.startsWith("\"")) {
+				StringBuilder userArgSb = new StringBuilder();
+				userArgSb.append(runArgSplit.substring(1));
+				i++;
+				for (; i < runArgArray.length; i++) {
+					if (runArgArray[i].endsWith("\"")) {
+						if (runArgArray[i].endsWith("\\\"")) {
+							userArgSb.append(" ");
+							userArgSb.append(runArgArray[i]);
+						} else {
+							userArgSb.append(" ");
+							userArgSb.append(runArgArray[i].substring(0, runArgArray[i].length() - 1));
+							break;
+						}
+					} else {
+						userArgSb.append(" ");
+						userArgSb.append(runArgArray[i]);
+					}
+				}
+				userArg = userArgSb.toString();
+				userArg = userArg.replace("\\\"", "\"");
+			}
+			
+			inputArgsList.add(userArg);
+			
+		}
+		useArgs = inputArgsList.toArray(new String[inputArgsList.size()]);
+		
+		return useArgs;
+		
+	}
 
 	public static <T extends App> List<T> dispatch(String[] args, String currentDir, boolean ret, Class<T> appClass) {
 
@@ -189,7 +245,8 @@ public class App {
 				System.out.println("Please input directory name or file name");
 				BufferedReader runReader = new BufferedReader(new InputStreamReader(System.in));
 				String runArg = runReader.readLine().trim();
-				useArgs = runArg.split(" ");
+				useArgs = stringToArray(runArg);
+
 			} else {
 				useArgs = args;
 			}
@@ -211,11 +268,14 @@ public class App {
 					if (useArgs.length > 1) {
 						for (int i = 1; i < useArgs.length; i++) {
 							line = line.replaceAll("(?<!\\\\)\\$" + String.valueOf(i), useArgs[i]);
+							line = line.replace("\\$" + String.valueOf(i), "$" + String.valueOf(i));
 						}
 					}
 
+					String[] inputArgsArray = stringToArray(line);
+					
 					Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
-					T app = constructor.newInstance(currentDir, line.split(" "));
+					T app = constructor.newInstance(currentDir, inputArgsArray);
 					app.execute();
 					
 					if (ret) {
@@ -254,13 +314,13 @@ public class App {
 
 	}
 
-	private void validate(String[] args, List<String> propFileNameList) {
+	private void validate(List<String> propFileNameList) {
 
 		BufferedReader reader = null;
 		
 		try {
 
-			this.mainDirName = args[0];
+			this.mainDirName = this.fmtArgs[0];
 			if (this.mainDirName.contains(".")) {
 				throw new RuntimeException("Can not interpret " + this.mainDirName);
 			}
@@ -346,8 +406,9 @@ public class App {
 
 		Session session = null;
 		boolean inputFlg = false;
+		boolean successFlg = false;
 
-		for (int i = 0; i < 3; i++) {
+		for (int i = 0; i < RETRY; i++) {
 
 			try {
 
@@ -393,20 +454,25 @@ public class App {
 				conf.setPassword(password);
 				conf.setPassphrase(passphrase);
 
+				successFlg = true;
 				break;
 
 			} catch (Exception e) {
+				if (i >= (RETRY - 1)) {
+					throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
+				}
+				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
 				if (inputFlg) {
-					this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-					if (i >= 2) {
-						throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
-					}
 					this.out.println("Please input it again");
 				} else {
-					throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
+					this.out.println("Retry...");
 				}
 			}
 
+		}
+		
+		if (!successFlg) {
+			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 		}
 
 		return session;
@@ -417,6 +483,8 @@ public class App {
 
 		this.printPoint("upload file", conf);
 
+		boolean successFlg = false;
+		
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
 		sb.append("/");
@@ -424,74 +492,106 @@ public class App {
 		sb.append("/");
 		sb.append(ROOT_DIR);
 
-		File mainDir = new File(this.currentDir, mainDirName);
+		File mainDir = new File(this.currentDir, this.mainDirName);
 		BufferedReader reader = null;
 
-		try {
-
-			ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
-			sftp.connect();
-
-			this.mkdir(sftp, sb.toString());
-
-			File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
-			if (includeListFile.isFile()) {
-				reader = new BufferedReader(new FileReader(includeListFile));
-				String line = null;
-				while ((line = reader.readLine()) != null) {
-					this.upDir(sftp, new File(this.currentDir, line.trim()), sb.toString());
-				}
-				reader.close();
-			}
-
-			this.upDir(sftp, mainDir, sb.toString());
-
-			sftp.disconnect();
-
-		} catch (Exception e) {
-			if (reader != null) {
-				try {
+		for (int i = 0; i < RETRY; i++) {
+		
+			try {
+	
+				ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
+				sftp.connect();
+	
+				this.mkdir(sftp, sb.toString());
+	
+				File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
+				if (includeListFile.isFile()) {
+					reader = new BufferedReader(new FileReader(includeListFile));
+					String line = null;
+					while ((line = reader.readLine()) != null) {
+						this.upDir(sftp, new File(this.currentDir, line.trim()), sb.toString());
+					}
 					reader.close();
-				} catch (IOException e1) {
-					e1.printStackTrace();
 				}
+	
+				this.upDir(sftp, mainDir, sb.toString());
+	
+				sftp.disconnect();
+
+				successFlg = true;
+				break;
+
+			} catch (Exception e) {
+				if (reader != null) {
+					try {
+						reader.close();
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+				}
+				if (i >= (RETRY - 1)) {
+					throw new RuntimeException(e);
+				}
+				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
+				this.out.println("Retry...");
 			}
-			throw new RuntimeException(e);
+			
+		}
+
+		if (!successFlg) {
+			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 		}
 
 	}
 
 	private void end(Session session, Conf conf) {
-
-		this.printPoint("delete file", conf);
-
+		
+		boolean successFlg = false;
+		
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
 		sb.append("/");
 		sb.append(conf.getUser());
 
-		try {
+		for (int i = 0; i < RETRY; i++) {
+		
+			try {
+	
+				ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
+				sftp.connect();
 
-			ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
-			sftp.connect();
+				this.getFile(sftp, conf);
 
-			this.rmdir(sftp, ROOT_DIR, sb.toString());
-			
-			sftp.disconnect();
+				sftp.cd(sb.toString());
+				this.printPoint("delete file", conf);
+				this.rmdir(sftp, ROOT_DIR, sb.toString());
+				
+				sftp.disconnect();
+	
+				session.disconnect();
 
-			session.disconnect();
+				successFlg = true;
+				break;
 
-		} catch (Exception e) {
-			throw new RuntimeException(e);
+			} catch (Exception e) {
+				if (i >= (RETRY - 1)) {
+					throw new RuntimeException(e);
+				}
+				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
+				this.out.println("Retry...");
+			}
+
+		}
+
+		if (!successFlg) {
+			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 		}
 
 	}
 
-	private boolean run(Session session, Conf conf) {
+	private void run(Session session, Conf conf) {
 
 		this.printPoint("run main.sh", conf);
-
-		boolean errorFlg = false;
 
 		try {
 
@@ -502,33 +602,48 @@ public class App {
 			sb.append("/");
 			sb.append(ROOT_DIR);
 			sb.append("/");
-			sb.append(mainDirName);
+			sb.append(this.mainDirName);
 			sb.append(" && ./");
 			sb.append(MAIN_SH);
 			if (this.mainShArg != null) {
 				sb.append(" ");
 				sb.append(this.mainShArg);
 			}
-			errorFlg = this.run(session, conf, sb.toString());
-			if (errorFlg) {
-				return errorFlg;
-			}
+			this.run(session, conf, sb.toString());
 
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
-		return errorFlg;
-
 	}
 
-	private boolean run(Session session, Conf conf, String command) {
+	private void run(Session session, Conf conf, String command) {
 
-		boolean errorFlg = false;
-
+		boolean successFlg = false;
+		
 		try {
 
-			Channel channel = session.openChannel("exec");
+			Channel channel = null;
+			
+			successFlg = false;
+			for (int i = 0; i < RETRY; i++) {
+				try {
+					channel = session.openChannel("exec");
+					successFlg = true;
+					break;
+				} catch (Exception e) {
+					if (i >= (RETRY - 1)) {
+						throw new RuntimeException(e);
+					}
+					this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
+					this.out.println("Retry...");
+				}
+			}
+
+			if (!successFlg) {
+				throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
+			}
+
 			ChannelExec channelExec = (ChannelExec) channel;
 			channelExec.setCommand(command);
 
@@ -538,7 +653,24 @@ public class App {
 			channelExec.setErrStream(new Print(new ByteArrayOutputStream(), this.out));
 			channelExec.setOutputStream(new Print(new ByteArrayOutputStream(), this.out));
 
-			channel.connect();
+			successFlg = false;
+			for (int i = 0; i < RETRY; i++) {
+				try {
+					channel.connect();
+					successFlg = true;
+					break;
+				} catch (Exception e) {
+					if (i >= (RETRY - 1)) {
+						throw new RuntimeException(e);
+					}
+					this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
+					this.out.println("Retry...");
+				}
+			}
+
+			if (!successFlg) {
+				throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
+			}
 
 			BufferedWriter outputWriter = new BufferedWriter(new OutputStreamWriter(out));
 			Output output = new Output(channelExec, this.in, outputWriter);
@@ -564,8 +696,6 @@ public class App {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
-		return errorFlg;
 
 	}
 
@@ -688,7 +818,118 @@ public class App {
 		}
 
 	}
+
+	private void getFile(ChannelSftp sftp, Conf conf) {
+
+		File mainDir = new File(this.currentDir, this.mainDirName);
+		BufferedReader reader = null;
+
+		try {
+
+			File getListFile = new File(mainDir, GET_LIST_FILE);
+			if (getListFile.isFile()) {
+
+				this.printPoint("get file", conf);
+
+				StringBuilder sb = new StringBuilder();
+				sb.append("/home/");
+				sb.append(conf.getUser());
+				sb.append("/");
+				sb.append(ROOT_DIR);
+				sb.append("/");
+				sb.append(this.mainDirName);
+				
+				sftp.cd(sb.toString());
+				
+				reader = new BufferedReader(new FileReader(getListFile));
+				String line = null;
+				String[] lineSplit = null;
+				String from = null;
+				String to = null;
+				while ((line = reader.readLine()) != null) {
+					lineSplit = line.split(" ");
+					for (String col : lineSplit) {
+						if ("".equals(col)) {
+							continue;
+						}
+						if (from == null) {
+							from = col;
+						} else {
+							if (to == null) {
+								to = col;
+								break;
+							}
+						}
+					}
+					this.getFile(sftp, conf, from, to);
+				}
+				reader.close();
+			}
+
+		} catch (Exception e) {
+			if (reader != null) {
+				try {
+					reader.close();
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+			}
+			throw new RuntimeException(e);
+		}
+		
+	}
+
+	private void getFile(ChannelSftp sftp, Conf conf, String from, String to) throws Exception {
+
+		if (this.fmtArgs.length > 1) {
+			for (int i = 1; i < this.fmtArgs.length; i++) {
+				to = to.replaceAll("(?<!\\\\)\\$" + String.valueOf(i), this.fmtArgs[i]);
+				to = to.replace("\\$" + String.valueOf(i), "$" + String.valueOf(i));
+			}
+		}
+		String serverFile = conf.getFile().split("\\.")[0];
+		to = to.replaceAll("(?<!\\\\)\\$\\{FILE\\}", serverFile);
+		to = to.replace("\\${FILE}", "${FILE}");
+		to = to.replaceAll("(?<!\\\\)\\$\\{SERVER\\}", conf.getServer());
+		to = to.replace("\\${SERVER}", "${SERVER}");
+		
+		File mainDir = new File(this.currentDir, this.mainDirName);
+		File toFile = new File(mainDir, to);
+
+		this.out.print("download ");
+		this.out.print(from);
+		this.out.print(" -> ");
+		this.out.println(toFile.getAbsolutePath());
+		
+		if (toFile.isFile() || toFile.isDirectory()) {
+			throw new RuntimeException("already exists : " + toFile.getAbsolutePath());
+		}
+
+		this.localMkdir(toFile);
+		
+		try {
+			sftp.get(from, toFile.getAbsolutePath());
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		
+	}
 	
+	private void localMkdir(File f) {
+		
+		File p = f.getParentFile();
+		if (p.isFile()) {
+			throw new RuntimeException("Not a directory : " + p.getAbsolutePath());
+		} else if (!p.isDirectory()) {
+			this.localMkdir(p);
+			boolean mkRet = p.mkdir();
+			if (!mkRet) {
+				throw new RuntimeException("Can not mkdir : " + p.getAbsolutePath());
+			}
+		}
+		
+	}
+
 	private void printPoint(String pointName, Conf conf) {
 
 		this.out.print("[");

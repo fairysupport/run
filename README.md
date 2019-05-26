@@ -425,6 +425,8 @@ sudo -S yum -y install httpd
 sudo -S mv /etc/httpd/conf/httpd.conf /etc/httpd/conf/httpd.conf.bk
 sudo -S cp ${RUN_DIR}/httpd.conf /etc/httpd/conf/httpd.conf
 sudo -S chmod 644 /etc/httpd/conf/httpd.conf
+sudo -S semanage fcontext -a -t httpd_config_t /etc/httpd/conf/httpd.conf
+sudo -S restorecon -v /etc/httpd/conf/httpd.conf
 
 ```
 

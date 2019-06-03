@@ -1,1 +1,1 @@
-sample "run sample" $2 $3 -f server2.properties
+sample "run sample" ${2} ${3} -f server2.properties

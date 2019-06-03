@@ -493,7 +493,7 @@ Hello php
 ```
 
 *Example8*  
-grouping 
+bulk 
 
 ```
 |-- com_fairysupport_run

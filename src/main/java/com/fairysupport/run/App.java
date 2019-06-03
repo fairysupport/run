@@ -11,7 +11,11 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +40,15 @@ public class App {
 	private static final String GET_LIST_FILE = "get.txt";
 	private static final String ROOT_DIR = "com_fairysupport_run";
 
-	private static final int RETRY = 3;
+	private boolean keygenerateOpFlg = false;
+	
+	private static Date NOW = null;
+
+	private static final int RETRY = 10;
+	
+	private String keyFileName = null;
+	private List<String> outputFileNameList = new ArrayList<String>();
+	private List<String> propFileNameList = new ArrayList<String>();
 	
 	protected String currentDir;
 	private String mainDirName;
@@ -73,18 +85,20 @@ public class App {
 			
 			List<String> argList = new ArrayList<String>();
 
-			List<String> propFileNameList = new ArrayList<String>();
-			
 			String arg = null;
 			boolean fOpFlg = false;
 			boolean iOpFlg = false;
+			boolean kOpFlg = false;
+			boolean oOpFlg = false;
 			for (int i = 0; i < rawArgs.length; i++) {
 				arg = rawArgs[i];
-				if (!"-f".equals(arg) && !fOpFlg && !"-i".equals(arg) && !iOpFlg) {
+				if (!"-f".equals(arg) && !fOpFlg && !"-i".equals(arg) && !iOpFlg && !"-k".equals(arg) && !kOpFlg && !"-o".equals(arg) && !oOpFlg) {
 					argList.add(arg);
 				}
 				fOpFlg = false;
 				iOpFlg = false;
+				kOpFlg = false;
+				oOpFlg = false;
 				if ("-f".equals(arg) && (i + 1) < rawArgs.length) {
 					String argPropFileName = rawArgs[i + 1];
 					String[] propFileNameSplit = argPropFileName.split(",");
@@ -110,6 +124,19 @@ public class App {
 					}
 					reader.close();
 					iOpFlg = true;
+				} else if ("-k".equals(arg) && (i + 1) < rawArgs.length) {
+					keyFileName = rawArgs[i + 1];
+					kOpFlg = true;
+				} else if ("-o".equals(arg) && (i + 1) < rawArgs.length) {
+					String argOutputFileName = rawArgs[i + 1];
+					String[] argOutputFileNameSplit = argOutputFileName.split(",");
+					for (String outputFileName : argOutputFileNameSplit) {
+						outputFileNameList.add(outputFileName);
+					}
+					oOpFlg = true;
+				} else if ("--keygenerate".equals(arg)) {
+					keygenerateOpFlg = true;
+					return;
 				}
 			}
 			
@@ -118,6 +145,35 @@ public class App {
 			}
 			
 			this.fmtArgs = argList.toArray(new String[argList.size()]);
+			
+			if (keyFileName != null) {
+				File keyFile = new File(this.currentDir, keyFileName);
+				if (!keyFile.isFile()) {
+					throw new RuntimeException("not found : " + keyFile.getAbsolutePath());
+				}
+			}
+
+			if (outputFileNameList.size() > 0) {
+				for (String outputFileName : outputFileNameList) {
+					File outputFile = new File(this.currentDir, outputFileName);
+					if (outputFile.exists()) {
+						throw new RuntimeException("already exists : " + outputFile.getAbsolutePath());
+					}
+				}
+				for (String propFileName : propFileNameList) {
+					File propFile = new File(this.currentDir, propFileName);
+					if (!propFile.exists()) {
+						throw new RuntimeException("not found " + propFileName);
+					}
+				}
+				if (outputFileNameList.size() != propFileNameList.size()) {
+					throw new RuntimeException("-f and -o numbers do not match");
+				}
+				if (keyFileName == null) {
+					throw new RuntimeException("Please give program -k");
+				}
+				return;
+			}
 
 			this.validate(propFileNameList);
 
@@ -174,7 +230,7 @@ public class App {
 			}
 
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		}
 
 	}
@@ -238,6 +294,14 @@ public class App {
 		
 		BufferedReader reader = null;
 		String[] useArgs = null;
+
+		Calendar cal = Calendar.getInstance();
+		NOW = cal.getTime();
+
+		SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
+		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
+		SimpleDateFormat mFmt = new SimpleDateFormat("mm");
+		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
 		
 		try {
 
@@ -264,13 +328,12 @@ public class App {
 					if ("".equals(line) || line.startsWith("#")) {
 						continue;
 					}
-					
-					if (useArgs.length > 1) {
-						for (int i = 1; i < useArgs.length; i++) {
-							line = line.replaceAll("(?<!\\\\)\\$" + String.valueOf(i), useArgs[i]);
-							line = line.replace("\\$" + String.valueOf(i), "$" + String.valueOf(i));
-						}
-					}
+
+					line = getArgReplace(useArgs, line);
+					line = getArgReplace("DATE", dateFmt.format(NOW), line);
+					line = getArgReplace("HH", hFmt.format(NOW), line);
+					line = getArgReplace("MM", mFmt.format(NOW), line);
+					line = getArgReplace("SS", sFmt.format(NOW), line);
 
 					String[] inputArgsArray = stringToArray(line);
 					
@@ -298,15 +361,24 @@ public class App {
 			}
 
 		} catch (Exception e) {
+			
+			Throwable target = e;
+			if (e instanceof InvocationTargetException) {
+				target = ((InvocationTargetException)e).getTargetException();
+			}
+			
 			if (reader != null) {
 				try {
 					reader.close();
 				} catch (IOException e1) {
-					e1.printStackTrace();
+					System.err.println("[error]");
+					System.err.println(target.getMessage());
+					System.err.println(e1.getMessage());
+					System.exit(1);
 				}
 			}
 			System.err.println("[error]");
-			System.err.println(e.getMessage());
+			System.err.println(target.getMessage());
 			System.exit(1);
 		}
 		
@@ -347,20 +419,20 @@ public class App {
 				String line = null;
 				while ((line = reader.readLine()) != null) {
 					File includeFile = new File(this.currentDir, line.trim());
-					if (!includeFile.exists()) {
-						throw new RuntimeException("not found " + includeFile.getAbsolutePath());
+					if (!includeFile.isDirectory()) {
+						throw new RuntimeException("not found directory " + includeFile.getAbsolutePath());
 					}
 				}
 			}
 
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		} finally {
 			if (reader != null) {
 				try {
 					reader.close();
 				} catch (IOException e) {
-					throw new RuntimeException(e);
+					throw new RuntimeException(e.getMessage(), e);
 				}
 			}
 		}
@@ -371,8 +443,20 @@ public class App {
 
 	}
 
-	public void execute() throws IOException {
+	public void execute() throws IOException, SftpException {
 		
+/*
+		if (outputFileNameList.size() > 0) {
+			this.encrypt();
+			return;
+		} else if (keygenerateOpFlg) {
+			this.keygenerate();
+			return;
+		}
+*/
+
+		Session session = null;
+
 		try {
 
 			for (Conf conf : srvList) {
@@ -380,7 +464,7 @@ public class App {
 				this.out.println(SEPARATOR);
 				this.printPoint("start", conf);
 	
-				Session session = this.getSesseion(conf);
+				session = this.getSesseion(conf);
 	
 				this.start(session, conf);
 				this.run(session, conf);
@@ -393,15 +477,19 @@ public class App {
 			
 		} finally {
 
+			if (session != null) {
+				session.disconnect();
+			}
+
 			try {
 				in.close();
 			} catch (IOException e) {
 			}
-
+			
 		}
 
 	}
-
+	
 	private Session getSesseion(Conf conf) {
 
 		Session session = null;
@@ -458,15 +546,7 @@ public class App {
 				break;
 
 			} catch (Exception e) {
-				if (i >= (RETRY - 1)) {
-					throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
-				}
-				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-				if (inputFlg) {
-					this.out.println("Please input it again");
-				} else {
-					this.out.println("Retry...");
-				}
+				this.retry(i, conf, e, inputFlg);
 			}
 
 		}
@@ -479,11 +559,16 @@ public class App {
 
 	}
 
-	private void start(Session session, Conf conf) {
+	private void start(Session session, Conf conf) throws IOException {
 
 		this.printPoint("upload file", conf);
 
-		boolean successFlg = false;
+		SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
+		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
+		SimpleDateFormat mFmt = new SimpleDateFormat("mm");
+		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
+
+		String serverFile = conf.getFile().split("\\.")[0];
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
@@ -493,100 +578,51 @@ public class App {
 		sb.append(ROOT_DIR);
 
 		File mainDir = new File(this.currentDir, this.mainDirName);
-		BufferedReader reader = null;
 
-		for (int i = 0; i < RETRY; i++) {
-		
-			try {
-	
-				ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
-				sftp.connect();
-	
-				this.mkdir(sftp, sb.toString());
-	
-				File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
-				if (includeListFile.isFile()) {
-					reader = new BufferedReader(new FileReader(includeListFile));
-					String line = null;
-					while ((line = reader.readLine()) != null) {
-						this.upDir(sftp, new File(this.currentDir, line.trim()), sb.toString());
-					}
-					reader.close();
-				}
-	
-				this.upDir(sftp, mainDir, sb.toString());
-	
-				sftp.disconnect();
+		ChannelSftp sftp = this.getSftp(session, conf);
+		this.mkdir(sftp, sb.toString());
 
-				successFlg = true;
-				break;
+		File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
+		if (includeListFile.isFile()) {
+			BufferedReader reader = new BufferedReader(new FileReader(includeListFile));
+			String line = null;
+			while ((line = reader.readLine()) != null) {
 
-			} catch (Exception e) {
-				if (reader != null) {
-					try {
-						reader.close();
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-				}
-				if (i >= (RETRY - 1)) {
-					throw new RuntimeException(e);
-				}
-				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-				this.out.println("Retry...");
+				line = getArgReplace(this.fmtArgs, line);
+				line = getArgReplace("FILE", serverFile, line);
+				line = getArgReplace("SERVER", conf.getServer(), line);
+				line = getArgReplace("DATE", dateFmt.format(NOW), line);
+				line = getArgReplace("HH", hFmt.format(NOW), line);
+				line = getArgReplace("MM", mFmt.format(NOW), line);
+				line = getArgReplace("SS", sFmt.format(NOW), line);
+
+				this.upDir(sftp, new File(this.currentDir, line.trim()), sb.toString());
 			}
-			
+			reader.close();
 		}
 
-		if (!successFlg) {
-			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
-		}
+		this.upDir(sftp, mainDir, sb.toString());
+		
+		sftp.disconnect();
 
 	}
 
-	private void end(Session session, Conf conf) {
-		
-		boolean successFlg = false;
+	private void end(Session session, Conf conf) throws SftpException {
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
 		sb.append("/");
 		sb.append(conf.getUser());
 
-		for (int i = 0; i < RETRY; i++) {
+		ChannelSftp sftp = this.getSftp(session, conf);
+		this.getFile(sftp, conf);
+
+		sftp.cd(sb.toString());
+		this.printPoint("delete file", conf);
+		this.rmdir(sftp, ROOT_DIR, sb.toString());
 		
-			try {
-	
-				ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
-				sftp.connect();
-
-				this.getFile(sftp, conf);
-
-				sftp.cd(sb.toString());
-				this.printPoint("delete file", conf);
-				this.rmdir(sftp, ROOT_DIR, sb.toString());
-				
-				sftp.disconnect();
-	
-				session.disconnect();
-
-				successFlg = true;
-				break;
-
-			} catch (Exception e) {
-				if (i >= (RETRY - 1)) {
-					throw new RuntimeException(e);
-				}
-				this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-				this.out.println("Retry...");
-			}
-
-		}
-
-		if (!successFlg) {
-			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
-		}
-
+		sftp.disconnect();
+		
 	}
 
 	private void run(Session session, Conf conf) {
@@ -612,36 +648,24 @@ public class App {
 			this.run(session, conf, sb.toString());
 
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		}
 
 	}
 
 	private void run(Session session, Conf conf, String command) {
 
-		boolean successFlg = false;
-		
 		try {
 
 			Channel channel = null;
 			
-			successFlg = false;
 			for (int i = 0; i < RETRY; i++) {
 				try {
 					channel = session.openChannel("exec");
-					successFlg = true;
 					break;
 				} catch (Exception e) {
-					if (i >= (RETRY - 1)) {
-						throw new RuntimeException(e);
-					}
-					this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-					this.out.println("Retry...");
+					this.retry(i, conf, e, false);
 				}
-			}
-
-			if (!successFlg) {
-				throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 			}
 
 			ChannelExec channelExec = (ChannelExec) channel;
@@ -653,23 +677,13 @@ public class App {
 			channelExec.setErrStream(new Print(new ByteArrayOutputStream(), this.out));
 			channelExec.setOutputStream(new Print(new ByteArrayOutputStream(), this.out));
 
-			successFlg = false;
 			for (int i = 0; i < RETRY; i++) {
 				try {
 					channel.connect();
-					successFlg = true;
 					break;
 				} catch (Exception e) {
-					if (i >= (RETRY - 1)) {
-						throw new RuntimeException(e);
-					}
-					this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
-					this.out.println("Retry...");
+					this.retry(i, conf, e, false);
 				}
-			}
-
-			if (!successFlg) {
-				throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 			}
 
 			BufferedWriter outputWriter = new BufferedWriter(new OutputStreamWriter(out));
@@ -694,9 +708,44 @@ public class App {
 			channel.disconnect();
 
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		}
 
+	}
+	
+	private ChannelSftp getSftp(Session session, Conf conf) {
+
+		ChannelSftp sftp = null;
+		
+		for (int i = 0; i < RETRY; i++) {
+			try {
+				sftp = (ChannelSftp) session.openChannel("sftp");
+				sftp.connect();
+				break;
+			} catch (Exception e) {
+				this.retry(i, conf, e, false);
+			}
+		}
+
+		return sftp;
+		
+	}
+	
+	private void retry(int i, Conf conf, Exception e, boolean inputFlg) {
+
+		if (i >= (RETRY - 1)) {
+			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort(), e);
+		}
+		this.out.println("can not connect " + conf.getAddress() + ":" + conf.getPort());
+		if (inputFlg) {
+			this.out.println("Please input it again");
+		} else {
+			this.out.println("Retry...");
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException sleepException) {
+			}
+		}
 	}
 
 	private void upDir(ChannelSftp sftp, File localDir, String srvRootPath) {
@@ -848,6 +897,8 @@ public class App {
 				String to = null;
 				while ((line = reader.readLine()) != null) {
 					lineSplit = line.split(" ");
+					from = null;
+					to = null;
 					for (String col : lineSplit) {
 						if ("".equals(col)) {
 							continue;
@@ -871,27 +922,38 @@ public class App {
 				try {
 					reader.close();
 				} catch (IOException e1) {
-					e1.printStackTrace();
+					throw new RuntimeException(e.getMessage() + System.lineSeparator() + e1.getMessage(), e);
 				}
 			}
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		}
 		
 	}
 
 	private void getFile(ChannelSftp sftp, Conf conf, String from, String to) throws Exception {
-
-		if (this.fmtArgs.length > 1) {
-			for (int i = 1; i < this.fmtArgs.length; i++) {
-				to = to.replaceAll("(?<!\\\\)\\$" + String.valueOf(i), this.fmtArgs[i]);
-				to = to.replace("\\$" + String.valueOf(i), "$" + String.valueOf(i));
-			}
-		}
+		
+		SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
+		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
+		SimpleDateFormat mFmt = new SimpleDateFormat("mm");
+		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
+		
 		String serverFile = conf.getFile().split("\\.")[0];
-		to = to.replaceAll("(?<!\\\\)\\$\\{FILE\\}", serverFile);
-		to = to.replace("\\${FILE}", "${FILE}");
-		to = to.replaceAll("(?<!\\\\)\\$\\{SERVER\\}", conf.getServer());
-		to = to.replace("\\${SERVER}", "${SERVER}");
+		
+		from = getArgReplace(this.fmtArgs, from);
+		from = getArgReplace("FILE", serverFile, from);
+		from = getArgReplace("SERVER", conf.getServer(), from);
+		from = getArgReplace("DATE", dateFmt.format(NOW), from);
+		from = getArgReplace("HH", hFmt.format(NOW), from);
+		from = getArgReplace("MM", mFmt.format(NOW), from);
+		from = getArgReplace("SS", sFmt.format(NOW), from);
+
+		to = getArgReplace(this.fmtArgs, to);
+		to = getArgReplace("FILE", serverFile, to);
+		to = getArgReplace("SERVER", conf.getServer(), to);
+		to = getArgReplace("DATE", dateFmt.format(NOW), to);
+		to = getArgReplace("HH", hFmt.format(NOW), to);
+		to = getArgReplace("MM", mFmt.format(NOW), to);
+		to = getArgReplace("SS", sFmt.format(NOW), to);
 		
 		File mainDir = new File(this.currentDir, this.mainDirName);
 		File toFile = new File(mainDir, to);
@@ -910,7 +972,7 @@ public class App {
 		try {
 			sftp.get(from, toFile.getAbsolutePath());
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.getMessage(), e);
 		}
 		
 	}
@@ -930,6 +992,19 @@ public class App {
 		
 	}
 
+	private static String getArgReplace(String[] args, String target) {
+		for (int i = 1; i < args.length; i++) {
+			target = getArgReplace(String.valueOf(i), args[i], target);
+		}
+		return target;
+	}
+
+	private static String getArgReplace(String arg, String replace, String target) {
+		target = target.replaceAll("(?<!\\\\)\\$\\{" + arg + "\\}", replace);
+		target = target.replace("\\${" + arg + "}", "$" + replace);
+		return target;
+	}
+	
 	private void printPoint(String pointName, Conf conf) {
 
 		this.out.print("[");

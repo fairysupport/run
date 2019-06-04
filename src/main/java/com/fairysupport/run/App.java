@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -12,6 +13,9 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -22,6 +26,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 
 import org.apache.commons.beanutils.PropertyUtils;
 
@@ -146,11 +154,13 @@ public class App {
 			
 			this.fmtArgs = argList.toArray(new String[argList.size()]);
 			
+			Dec dec = null;
 			if (keyFileName != null) {
 				File keyFile = new File(this.currentDir, keyFileName);
 				if (!keyFile.isFile()) {
 					throw new RuntimeException("not found : " + keyFile.getAbsolutePath());
 				}
+				dec = new Dec(keyFileName);
 			}
 
 			if (outputFileNameList.size() > 0) {
@@ -222,7 +232,11 @@ public class App {
 					}
 	
 					conf = srvList.get(srvMap.get(serverName));
-					confValue = props.getProperty(strKey);
+					if (dec != null && ("password".equals(strKeySplit[1]) || "passphrase".equals(strKeySplit[1]))) {
+						confValue = dec.decrypto(props.getProperty(strKey));
+					} else {
+						confValue = props.getProperty(strKey);
+					}
 					PropertyUtils.setProperty(conf, strKeySplit[1], confValue == null ? "" : confValue);
 	
 				}
@@ -443,17 +457,23 @@ public class App {
 
 	}
 
-	public void execute() throws IOException, SftpException {
+	public void execute() throws NoSuchAlgorithmException, IOException, SftpException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		
-/*
+
 		if (outputFileNameList.size() > 0) {
 			this.encrypt();
 			return;
 		} else if (keygenerateOpFlg) {
-			this.keygenerate();
+			File generateKeyFile = new File(this.currentDir, "fairysupport_run_key.txt");
+			if (generateKeyFile.isFile()) {
+				throw new RuntimeException("already exists fairysupport_run_key.txt");
+			}
+			EncKey encKey = new EncKey();
+			encKey.generate(generateKeyFile.getAbsolutePath());
+			this.out.println("key generate");
+			this.out.println(generateKeyFile.getAbsolutePath());
 			return;
 		}
-*/
 
 		Session session = null;
 
@@ -486,6 +506,54 @@ public class App {
 			} catch (IOException e) {
 			}
 			
+		}
+
+	}
+	
+	private void encrypt() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, IOException, IllegalBlockSizeException, BadPaddingException {
+		
+		String propFileName = null;
+		String outputFileName = null;
+		
+		Enc enc = new Enc(this.keyFileName);
+
+		for (int i = 0; i < propFileNameList.size(); i++) {
+			
+			propFileName = propFileNameList.get(i);
+			outputFileName = outputFileNameList.get(i);
+			
+			String propFilePath = (new File(this.currentDir, propFileName)).getCanonicalFile().getCanonicalPath();
+
+			BufferedReader reader = new BufferedReader(new FileReader(propFilePath));
+			Properties props = new Properties();
+			props.load(reader);
+			reader.close();
+
+			Properties newProps = new Properties();
+
+			Set<Object> keys = props.keySet();
+			String strKey = null;
+			String[] strKeySplit = null;
+			for (Object key : keys) {
+				strKey = (String) key;
+				strKeySplit = strKey.split("\\.");
+				if (strKeySplit.length != 2) {
+					throw new RuntimeException("wrong key " + propFileName + "." + strKey);
+				}
+				
+				if ("password".equals(strKeySplit[1]) || "passphrase".equals(strKeySplit[1])) {
+					newProps.setProperty(strKey, enc.encrypto(props.getProperty(strKey)));
+				} else {
+					newProps.setProperty(strKey, props.getProperty(strKey));
+				}
+			}
+
+			File outputFile = new File(this.currentDir, outputFileName);
+			BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+			newProps.store(writer, "fairysupport run");
+			writer.flush();
+			writer.close();
+
 		}
 
 	}
@@ -1001,7 +1069,7 @@ public class App {
 
 	private static String getArgReplace(String arg, String replace, String target) {
 		target = target.replaceAll("(?<!\\\\)\\$\\{" + arg + "\\}", replace);
-		target = target.replace("\\${" + arg + "}", "$" + replace);
+		target = target.replace("\\${" + arg + "}", "${" + replace + "}");
 		return target;
 	}
 	

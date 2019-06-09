@@ -92,11 +92,15 @@ public class AppTest {
 					sb.append(System.lineSeparator());
 					sb.append("mkdir /home/" + conf.getUser() + "/com_fairysupport_run/common");
 					sb.append(System.lineSeparator());
-					sb.append("upload " + app.currentDir + File.separator + "common" + File.separator + "common.sh -> /home/" + conf.getUser() + "/com_fairysupport_run/common/common.sh");
+					sb.append("upload " + app.currentDir + File.separator + "sample" + File.separator + ".." + File.separator + "common" + File.separator + "common.sh -> /home/" + conf.getUser() + "/com_fairysupport_run/common/common.sh");
 					sb.append(System.lineSeparator());
 					sb.append("mkdir /home/" + conf.getUser() + "/com_fairysupport_run/common2");
 					sb.append(System.lineSeparator());
-					sb.append("upload " + app.currentDir + File.separator + "common2" + File.separator + "dummy.txt -> /home/" + conf.getUser() + "/com_fairysupport_run/common2/dummy.txt");
+					sb.append("upload " + app.currentDir + File.separator + "sample" + File.separator + ".." + File.separator + "common2" + File.separator + "dummy.txt -> /home/" + conf.getUser() + "/com_fairysupport_run/common2/dummy.txt");
+					sb.append(System.lineSeparator());
+					sb.append("mkdir /home/" + conf.getUser() + "/com_fairysupport_run/aaa");
+					sb.append(System.lineSeparator());
+					sb.append("upload " + app.currentDir + File.separator + "sample" + File.separator + ".." + File.separator + "aaa" + File.separator + "dummy.txt -> /home/" + conf.getUser() + "/com_fairysupport_run/aaa/dummy.txt");
 					sb.append(System.lineSeparator());
 					sb.append("mkdir /home/" + conf.getUser() + "/com_fairysupport_run/sample");
 					sb.append(System.lineSeparator());
@@ -124,6 +128,8 @@ public class AppTest {
 					sb.append(System.lineSeparator());
 					sb.append("download ./sample.sh -> " + app.currentDir + File.separator + "sample" + File.separator + ".." + File.separator + "get" + File.separator+ conf.getServer() + File.separator + conf.getFile().split("\\.")[0] + File.separator + "aaa" + File.separator + "sample.sh");
 					sb.append(System.lineSeparator());
+					sb.append("download ../aaa/dummy.txt -> " + app.currentDir + File.separator + "sample" + File.separator + ".." + File.separator + "get" + File.separator+ conf.getServer() + File.separator + conf.getFile().split("\\.")[0] + File.separator + "aaa" + File.separator + "abc" + File.separator + "dummy.txt");
+					sb.append(System.lineSeparator());
 					sb.append("[delete file][" + conf.getAddress() + ":" + conf.getPort() + "]");
 					sb.append(System.lineSeparator());
 					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/common/common.sh");
@@ -134,6 +140,10 @@ public class AppTest {
 					sb.append(System.lineSeparator());
 					sb.append("rmdir /home/" + conf.getUser() + "/com_fairysupport_run/common2");
 					sb.append(System.lineSeparator());
+					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/aaa/dummy.txt");
+					sb.append(System.lineSeparator());
+					sb.append("rmdir /home/" + conf.getUser() + "/com_fairysupport_run/aaa");
+					sb.append(System.lineSeparator());
 					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/sample/get.txt");
 					sb.append(System.lineSeparator());
 					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/sample/include.txt");
@@ -141,6 +151,8 @@ public class AppTest {
 					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/sample/main.sh");
 					sb.append(System.lineSeparator());
 					sb.append("delete /home/" + conf.getUser() + "/com_fairysupport_run/sample/sample.sh");
+					sb.append(System.lineSeparator());
+					sb.append("rmdir /home/" + conf.getUser() + "/com_fairysupport_run/sample/newDir");
 					sb.append(System.lineSeparator());
 					sb.append("rmdir /home/" + conf.getUser() + "/com_fairysupport_run/sample");
 					sb.append(System.lineSeparator());
@@ -154,7 +166,7 @@ public class AppTest {
 	
 				String expect = sb.toString();
 				String actual = app.getByteOut().toString();
-	
+				
 				assertEquals(expect, actual);
 				
 				serverFile = serverFileList.get(i);
@@ -171,9 +183,11 @@ public class AppTest {
 					reader.close();
 
 					StringBuilder includeSb = new StringBuilder();
-					includeSb.append("common");
+					includeSb.append("../common");
 					includeSb.append("\n");
-					includeSb.append("common2");
+					includeSb.append("../common2");
+					includeSb.append("\n");
+					includeSb.append("../${3}");
 					includeSb.append("\n");
 					
 					assertEquals(includeSb.toString(), getSb.toString());
@@ -207,6 +221,32 @@ public class AppTest {
 					
 					sampleShFile.delete();
 					
+
+					File getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0] + "/emptyDir");
+					if (getDir.isDirectory()) {
+						assertTrue(true);
+					} else {
+						assertTrue(false);
+					}
+					
+					getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0] + "/aaa/abc/dummy.txt");
+					getDir.delete();
+
+					getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0] + "/aaa/abc");
+					getDir.delete();
+
+					getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0] + "/aaa");
+					getDir.delete();
+
+					getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0] + "/emptyDir");
+					getDir.delete();
+
+					getDir = new File(currentObj, "get/" + svPair[1] + "/" + svPair[0]);
+					getDir.delete();
+
+					getDir = new File(currentObj, "get/" + svPair[1]);
+					getDir.delete();
+
 				}
 				
 			}

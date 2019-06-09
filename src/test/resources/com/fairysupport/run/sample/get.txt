@@ -1,2 +1,4 @@
 ./include.txt ../get/${SERVER}/${FILE}/${3}/include.txt
 ./sample.sh ../get/${SERVER}/${FILE}/${3}/sample.sh
+../aaa ../get/${SERVER}/${FILE}/${3}/abc
+./newDir ../get/${SERVER}/${FILE}/emptyDir

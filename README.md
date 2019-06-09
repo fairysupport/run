@@ -264,8 +264,8 @@ echo "Hello common2"
 include.txt
 
 ```
-common1
-common2
+../common1
+../common2
 
 ```
 

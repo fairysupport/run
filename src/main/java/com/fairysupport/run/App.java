@@ -334,6 +334,8 @@ public class App {
 			}
 			File argFile = (new File(currentDir, useArgs[0]));
 			if (argFile.isFile()) {
+
+				File argFileParent = argFile.getParentFile();
 				
 				reader = new BufferedReader(new FileReader(argFile));
 				String line = null;
@@ -352,7 +354,7 @@ public class App {
 					String[] inputArgsArray = stringToArray(line);
 					
 					Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
-					T app = constructor.newInstance(currentDir, inputArgsArray);
+					T app = constructor.newInstance(argFileParent.getAbsolutePath(), inputArgsArray);
 					app.execute();
 					
 					if (ret) {
@@ -424,18 +426,6 @@ public class App {
 				File propFile = new File(this.currentDir, propFileName);
 				if (!propFile.exists()) {
 					throw new RuntimeException("not found " + propFileName);
-				}
-			}
-
-			File includeListFile = (new File(mainDir, INCLUDE_LIST_FILE));
-			if (includeListFile.isFile()) {
-				reader = new BufferedReader(new FileReader(includeListFile));
-				String line = null;
-				while ((line = reader.readLine()) != null) {
-					File includeFile = new File(this.currentDir, line.trim());
-					if (!includeFile.isDirectory()) {
-						throw new RuntimeException("not found directory " + includeFile.getAbsolutePath());
-					}
 				}
 			}
 
@@ -664,7 +654,14 @@ public class App {
 				line = getArgReplace("MM", mFmt.format(NOW), line);
 				line = getArgReplace("SS", sFmt.format(NOW), line);
 
-				this.upDir(sftp, new File(this.currentDir, line.trim()), sb.toString());
+				File includeFile = new File(mainDir, line.trim());
+				if (!includeFile.isDirectory()) {
+					reader.close();
+					sftp.disconnect();
+					throw new RuntimeException(INCLUDE_LIST_FILE + " : not found directory " + includeFile.getAbsolutePath());
+				}
+				
+				this.upDir(sftp, includeFile, sb.toString());
 			}
 			reader.close();
 		}
@@ -941,6 +938,9 @@ public class App {
 		File mainDir = new File(this.currentDir, this.mainDirName);
 		BufferedReader reader = null;
 
+		String from = null;
+		String to = null;
+		
 		try {
 
 			File getListFile = new File(mainDir, GET_LIST_FILE);
@@ -961,8 +961,8 @@ public class App {
 				reader = new BufferedReader(new FileReader(getListFile));
 				String line = null;
 				String[] lineSplit = null;
-				String from = null;
-				String to = null;
+				from = null;
+				to = null;
 				while ((line = reader.readLine()) != null) {
 					lineSplit = line.split(" ");
 					from = null;
@@ -986,14 +986,22 @@ public class App {
 			}
 
 		} catch (Exception e) {
+			
+			String msg = e.getMessage();
+			if (e instanceof SftpException) {
+				if ("No such file".equals(msg)) {
+					msg = GET_LIST_FILE + " : " + from + " : " + e.getMessage();
+				}
+			}
+			
 			if (reader != null) {
 				try {
 					reader.close();
 				} catch (IOException e1) {
-					throw new RuntimeException(e.getMessage() + System.lineSeparator() + e1.getMessage(), e);
+					throw new RuntimeException(msg + System.lineSeparator() + e1.getMessage(), e);
 				}
 			}
-			throw new RuntimeException(e.getMessage(), e);
+			throw new RuntimeException(msg, e);
 		}
 		
 	}
@@ -1023,38 +1031,88 @@ public class App {
 		to = getArgReplace("MM", mFmt.format(NOW), to);
 		to = getArgReplace("SS", sFmt.format(NOW), to);
 		
-		File mainDir = new File(this.currentDir, this.mainDirName);
-		File toFile = new File(mainDir, to);
+		this.getFile(sftp, from, to);
 
-		this.out.print("download ");
-		this.out.print(from);
-		this.out.print(" -> ");
-		this.out.println(toFile.getAbsolutePath());
-		
-		if (toFile.isFile() || toFile.isDirectory()) {
-			throw new RuntimeException("already exists : " + toFile.getAbsolutePath());
-		}
-
-		this.localMkdir(toFile);
-		
-		try {
-			sftp.get(from, toFile.getAbsolutePath());
-		} catch (Exception e) {
-			throw new RuntimeException(e.getMessage(), e);
-		}
-		
 	}
-	
-	private void localMkdir(File f) {
+
+	private void getFile(ChannelSftp sftp, String from, String to) throws SftpException {
+
+		String preMsg = GET_LIST_FILE + " : ";
+		
+		boolean loopExists = false;
+		boolean getSuccess = false;
+		
+		@SuppressWarnings("unchecked")
+		Vector<LsEntry> lsList = sftp.ls(from);
+		for (LsEntry child : lsList) {
+			loopExists = true;
+			if (child.getFilename().equals("..") || child.getFilename().equals(".")) {
+				continue;
+			}
+			if (child.getAttrs().isDir()) {
+				this.getFile(sftp, from + "/" + child.getFilename(), to + File.separator + child.getFilename());
+			} else {
+				
+				String fromFileName = from;
+				String toFileName = to;
+				if (lsList.size() > 1) {
+					fromFileName = from + "/" + child.getFilename();
+					toFileName = to + "/" + child.getFilename();
+				}
+
+				File mainDir = new File(this.currentDir, this.mainDirName);
+				File toFile = new File(mainDir, toFileName);
+				
+				this.out.print("download ");
+				this.out.print(fromFileName);
+				this.out.print(" -> ");
+				this.out.println(toFile.getAbsolutePath());
+				
+				if (toFile.isFile() || toFile.isDirectory()) {
+					throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
+				}
+
+				this.localMkdir(toFile, preMsg);
+				
+				try {
+					sftp.get(fromFileName, toFile.getAbsolutePath());
+				} catch (Exception e) {
+					throw new RuntimeException(preMsg + e.getMessage(), e);
+				}
+				
+			}
+			getSuccess = true;
+			
+		}
+		
+		if (loopExists && !getSuccess) {
+
+			File mainDir = new File(this.currentDir, this.mainDirName);
+			File toFile = new File(mainDir, to);
+			this.localMkdir(toFile, preMsg);
+
+			if (toFile.isFile() || toFile.isDirectory()) {
+				throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
+			}
+			boolean mkRet = toFile.mkdir();
+			if (!mkRet) {
+				throw new RuntimeException(preMsg + "Can not mkdir : " + toFile.getAbsolutePath());
+			}
+			
+		}
+
+	}
+
+	private void localMkdir(File f, String preMsg) {
 		
 		File p = f.getParentFile();
 		if (p.isFile()) {
-			throw new RuntimeException("Not a directory : " + p.getAbsolutePath());
+			throw new RuntimeException(preMsg + "Not a directory : " + p.getAbsolutePath());
 		} else if (!p.isDirectory()) {
-			this.localMkdir(p);
+			this.localMkdir(p, preMsg);
 			boolean mkRet = p.mkdir();
 			if (!mkRet) {
-				throw new RuntimeException("Can not mkdir : " + p.getAbsolutePath());
+				throw new RuntimeException(preMsg + "Can not mkdir : " + p.getAbsolutePath());
 			}
 		}
 		

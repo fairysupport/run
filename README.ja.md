@@ -264,7 +264,7 @@ echo "Hello common2"
 include.txt
 
 ```
-../common1
+../${1}
 ../common2
 
 ```
@@ -290,7 +290,7 @@ main.sh
 ```
 
 ```
-java -jar com_fairysupport_run.jar sample3
+java -jar com_fairysupport_run.jar sample3 common1
 
 -----------------------------------------------------------------------------------------------------------------------
 ....
@@ -353,12 +353,28 @@ add text
 ```
 |-- com_fairysupport_run
 |   |-- com_fairysupport_run.jar
-|   |-- server.properties
+|   |-- server_raw.properties
 |   `-- sample5
 |       `-- main.sh
 ```
 
-server.properties
+```
+java -jar com_fairysupport_run.jar --keygenerate
+
+```
+
+fairysupport\_run\_key.txtができます
+
+```
+|-- com_fairysupport_run
+|   |-- com_fairysupport_run.jar
+|   |-- fairysupport_run_key.txt
+|   |-- server_raw.properties
+|   `-- sample5
+|       `-- main.sh
+```
+
+server_raw.properties
 
 ```
 server1.address=127.0.0.2
@@ -372,6 +388,39 @@ server2.port=22
 
 ```
 
+```
+java -jar com_fairysupport_run.jar -k fairysupport_run_key.txt -f server_raw.properties -o server.properties
+
+```
+
+server.propertiesができます
+
+```
+|-- com_fairysupport_run
+|   |-- com_fairysupport_run.jar
+|   |-- fairysupport_run_key.txt
+|   |-- server_raw.properties
+|   |-- server.properties
+|   `-- sample5
+|       `-- main.sh
+```
+
+server.properties
+
+```
+server1.address=127.0.0.2
+server1.port=22
+server1.user=user1
+server1.password=xxxxxxx
+server1.keyPath=/path/id_rsa
+server1.passphrase=xxxxxx
+server2.address=127.0.0.3
+server2.port=22
+
+```
+
+password、passphraseが暗号化されています
+
 main.sh
 
 ```
@@ -382,7 +431,7 @@ echo "Hello world"
 ```
 
 ```
-java -jar com_fairysupport_run.jar sample5
+java -jar com_fairysupport_run.jar sample5 -k fairysupport_run_key.txt -f server.properties
 
 -----------------------------------------------------------------------------------------------------------------------
 ....
@@ -530,13 +579,13 @@ server2.port=22
 sample8.txt
 
 ```
-sample1 arg1 arg2 -f server1.properties
+sample1 ${1} arg2 -f server1.properties
 sample2 -f server2.properties
 
 ```
 
 ```
-java -jar com_fairysupport_run.jar sample8.txt
+java -jar com_fairysupport_run.jar sample8.txt arg1
 
 -----------------------------------------------------------------------------------------------------------------------
 ....

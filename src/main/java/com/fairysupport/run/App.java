@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -339,6 +341,20 @@ public class App {
 				
 				reader = new BufferedReader(new FileReader(argFile));
 				String line = null;
+				while ((line = reader.readLine()) != null) {
+					line = line.trim();
+					if ("".equals(line) || line.startsWith("#")) {
+						continue;
+					}
+					
+					validateArg(useArgs, line);
+
+				}
+				reader.close();
+				
+				
+				reader = new BufferedReader(new FileReader(argFile));
+				line = null;
 				while ((line = reader.readLine()) != null) {
 					line = line.trim();
 					if ("".equals(line) || line.startsWith("#")) {
@@ -940,6 +956,7 @@ public class App {
 
 		String from = null;
 		String to = null;
+		int lineNo = 0;
 		
 		try {
 
@@ -964,6 +981,7 @@ public class App {
 				from = null;
 				to = null;
 				while ((line = reader.readLine()) != null) {
+					lineNo++;
 					lineSplit = line.split(" ");
 					from = null;
 					to = null;
@@ -989,8 +1007,8 @@ public class App {
 			
 			String msg = e.getMessage();
 			if (e instanceof SftpException) {
-				if ("No such file".equals(msg)) {
-					msg = GET_LIST_FILE + " : " + from + " : " + e.getMessage();
+				if (msg.endsWith("No such file")) {
+					msg = GET_LIST_FILE + " line:" + lineNo + " " + e.getMessage();
 				}
 			}
 			
@@ -1036,69 +1054,89 @@ public class App {
 	}
 
 	private void getFile(ChannelSftp sftp, String from, String to) throws SftpException {
+		
+		try {
 
-		String preMsg = GET_LIST_FILE + " : ";
-		
-		boolean loopExists = false;
-		boolean getSuccess = false;
-		
-		@SuppressWarnings("unchecked")
-		Vector<LsEntry> lsList = sftp.ls(from);
-		for (LsEntry child : lsList) {
-			loopExists = true;
-			if (child.getFilename().equals("..") || child.getFilename().equals(".")) {
-				continue;
-			}
-			if (child.getAttrs().isDir()) {
-				this.getFile(sftp, from + "/" + child.getFilename(), to + File.separator + child.getFilename());
-			} else {
-				
-				String fromFileName = from;
-				String toFileName = to;
-				if (lsList.size() > 1) {
-					fromFileName = from + "/" + child.getFilename();
-					toFileName = to + "/" + child.getFilename();
+			String preMsg = GET_LIST_FILE + " : ";
+			
+			boolean loopExists = false;
+			boolean getSuccess = false;
+			
+			@SuppressWarnings("unchecked")
+			Vector<LsEntry> lsList = sftp.ls(from);
+			for (LsEntry child : lsList) {
+				loopExists = true;
+				if (child.getFilename().equals("..") || child.getFilename().equals(".")) {
+					continue;
 				}
-
+				if (child.getAttrs().isDir()) {
+					this.getFile(sftp, from + "/" + child.getFilename(), to + File.separator + child.getFilename());
+				} else {
+					
+					String fromFileName = from;
+					String toFileName = to;
+					if (lsList.size() > 1) {
+						fromFileName = from + "/" + child.getFilename();
+						toFileName = to + "/" + child.getFilename();
+					}
+	
+					File mainDir = new File(this.currentDir, this.mainDirName);
+					File toFile = new File(mainDir, toFileName);
+					
+					this.out.print("download ");
+					this.out.print(fromFileName);
+					this.out.print(" -> ");
+					this.out.println(toFile.getAbsolutePath());
+					
+					if (toFile.isFile() || toFile.isDirectory()) {
+						throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
+					}
+	
+					this.localMkdir(toFile, preMsg);
+					
+					try {
+						sftp.get(fromFileName, toFile.getAbsolutePath());
+					} catch (Exception e) {
+						throw new RuntimeException(preMsg + e.getMessage(), e);
+					}
+					
+				}
+				getSuccess = true;
+				
+			}
+			
+			if (loopExists && !getSuccess) {
+	
 				File mainDir = new File(this.currentDir, this.mainDirName);
-				File toFile = new File(mainDir, toFileName);
-				
-				this.out.print("download ");
-				this.out.print(fromFileName);
-				this.out.print(" -> ");
-				this.out.println(toFile.getAbsolutePath());
-				
+				File toFile = new File(mainDir, to);
+				this.localMkdir(toFile, preMsg);
+	
 				if (toFile.isFile() || toFile.isDirectory()) {
 					throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
 				}
-
-				this.localMkdir(toFile, preMsg);
-				
-				try {
-					sftp.get(fromFileName, toFile.getAbsolutePath());
-				} catch (Exception e) {
-					throw new RuntimeException(preMsg + e.getMessage(), e);
+				boolean mkRet = toFile.mkdir();
+				if (!mkRet) {
+					throw new RuntimeException(preMsg + "Can not mkdir : " + toFile.getAbsolutePath());
 				}
 				
 			}
-			getSuccess = true;
 			
-		}
-		
-		if (loopExists && !getSuccess) {
+		} catch (SftpException e) {
 
-			File mainDir = new File(this.currentDir, this.mainDirName);
-			File toFile = new File(mainDir, to);
-			this.localMkdir(toFile, preMsg);
-
-			if (toFile.isFile() || toFile.isDirectory()) {
-				throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
-			}
-			boolean mkRet = toFile.mkdir();
-			if (!mkRet) {
-				throw new RuntimeException(preMsg + "Can not mkdir : " + toFile.getAbsolutePath());
+			String msg = e.getMessage();
+			if ("No such file".equals(msg)) {
+				msg = from + " : " + e.getMessage();
 			}
 			
+			String eStr = e.toString();
+			String[] eStrSplit = eStr.split(":");
+			int id = 0;
+			try {
+				id = Integer.parseInt(eStrSplit[0]);
+			} catch (Exception e1) {
+				id = 0;
+			}
+			throw new SftpException(id, msg, e.getCause());
 		}
 
 	}
@@ -1129,6 +1167,37 @@ public class App {
 		target = target.replaceAll("(?<!\\\\)\\$\\{" + arg + "\\}", replace);
 		target = target.replace("\\${" + arg + "}", "${" + replace + "}");
 		return target;
+	}
+
+	private static void validateArg(String[] args, String target) {
+
+		StringBuilder sb = new StringBuilder();
+		
+		String regexp = "(?<!\\\\)\\$\\{[1-9][0-9]*\\}";
+		Pattern pt = Pattern.compile(regexp);
+		Matcher m = pt.matcher(target);
+		String grp = null;
+		String indexStr = null;
+		int index = -1;
+		while (m.find()) {
+			try {
+				grp = m.group();
+				indexStr = grp.substring(2, grp.length() - 1);
+				index = Integer.parseInt(indexStr);
+				if (args.length <= index) {
+					sb.append(grp);
+				}
+			} catch (IndexOutOfBoundsException e) {
+				sb.append(grp);
+			} catch (NumberFormatException e) {
+				sb.append(grp);
+			}
+		}
+		
+		if (sb.length() > 0) {
+			throw new RuntimeException("Please input argument " + sb.toString());
+		}
+		
 	}
 	
 	private void printPoint(String pointName, Conf conf) {

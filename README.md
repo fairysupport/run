@@ -638,5 +638,100 @@ arg2
 -----------------------------------------------------------------------------------------------------------------------
 ```
 
+*Example10*  
+get file  
+Write the necessary file or directory name in get.txt  
+
+```
+|-- com_fairysupport_run
+|   |-- com_fairysupport_run.jar
+|   |-- server.properties
+|   `-- sample10
+|       |-- get.txt
+|       `-- main.sh
+```
+
+server.properties
+
+```
+server1.address=127.0.0.2
+server1.port=22
+server1.keyPath=/path/id_rsa
+server2.address=127.0.0.3
+server2.port=22
+
+```
+
+get.txt
+
+```
+sample1.txt ../sample10_result/${FILE}_${SERVER}_local_sample.txt
+../hello ../sample10_result/${FILE}_${SERVER}_local_hello
+${1}.txt ../sample10_result/${FILE}_${SERVER}_local_${1}.txt
+
+```
+
+main.sh
+
+```
+#!/bin/bash
+
+echo "hello1" > sample1.txt
+mkdir ../hello
+echo "hello2" > ../hello/sample2.txt
+echo "hello3" > ${1}.txt
+
+```
+
+```
+java -jar com_fairysupport_run.jar sample10 arg1
+
+-----------------------------------------------------------------------------------------------------------------------
+[start][127.0.0.3:22]
+....
+
+[get file][127.0.0.3:22]
+download sample1.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server2_local_sample.txt
+download ../hello/sample2.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server2_local_hello\sample2.txt
+download arg1.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server2_local_arg1.txt
+
+....
+
+[end][127.0.0.3:22]
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+[start][127.0.0.2:22]
+
+....
+
+[get file][127.0.0.2:22]
+download sample1.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server1_local_sample.txt
+download ../hello/sample2.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server1_local_hello\sample2.txt
+download arg1.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server1_local_arg1.txt
+
+....
+
+[end][127.0.0.2:22]
+-----------------------------------------------------------------------------------------------------------------------
+```
+
+```
+|-- com_fairysupport_run
+|   |-- com_fairysupport_run.jar
+|   |-- server.properties
+|   |-- sample10
+|   |   |-- get.txt
+|   |   |-- main.sh
+|   `-- sample10_result
+|       |-- server_server1_local_hello
+|       |   `-- sample2.txt
+|       |-- server_server2_local_hello
+|       |   `-- sample2.txt
+|       |-- server_server1_local_arg1.txt
+|       |-- server_server1_local_sample.txt
+|       |-- server_server2_local_arg1.txt
+|       `-- server_server2_local_sample.txt
+```
+
 ## License
 MIT

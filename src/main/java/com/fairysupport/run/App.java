@@ -94,6 +94,8 @@ public class App {
 			}
 			
 			List<String> argList = new ArrayList<String>();
+			
+			String propSuffix = this.getEnv();
 
 			String arg = null;
 			boolean fOpFlg = false;
@@ -113,7 +115,7 @@ public class App {
 					String argPropFileName = rawArgs[i + 1];
 					String[] propFileNameSplit = argPropFileName.split(",");
 					for (String propFileName : propFileNameSplit) {
-						propFileNameList.add(propFileName);
+						propFileNameList.add(propFileName + propSuffix);
 					}
 					fOpFlg = true;
 				} else if ("-i".equals(arg) && (i + 1) < rawArgs.length) {
@@ -130,7 +132,7 @@ public class App {
 						if ("".equals(line.trim())) {
 							continue;
 						}
-						propFileNameList.add(line.trim());
+						propFileNameList.add(line.trim() + propSuffix);
 					}
 					reader.close();
 					iOpFlg = true;
@@ -141,7 +143,7 @@ public class App {
 					String argOutputFileName = rawArgs[i + 1];
 					String[] argOutputFileNameSplit = argOutputFileName.split(",");
 					for (String outputFileName : argOutputFileNameSplit) {
-						outputFileNameList.add(outputFileName);
+						outputFileNameList.add(outputFileName + propSuffix);
 					}
 					oOpFlg = true;
 				} else if ("--keygenerate".equals(arg)) {
@@ -151,7 +153,7 @@ public class App {
 			}
 			
 			if (propFileNameList.size() == 0) {
-				propFileNameList.add(PROP_FILE_NAME);
+				propFileNameList.add(PROP_FILE_NAME + propSuffix);
 			}
 			
 			this.fmtArgs = argList.toArray(new String[argList.size()]);
@@ -311,8 +313,10 @@ public class App {
 		BufferedReader reader = null;
 		String[] useArgs = null;
 
-		Calendar cal = Calendar.getInstance();
-		NOW = cal.getTime();
+		if (NOW == null) {
+			Calendar cal = Calendar.getInstance();
+			NOW = cal.getTime();
+		}
 
 		SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
 		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
@@ -370,11 +374,25 @@ public class App {
 					String[] inputArgsArray = stringToArray(line);
 					
 					Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
-					T app = constructor.newInstance(argFileParent.getAbsolutePath(), inputArgsArray);
-					app.execute();
 					
-					if (ret) {
-						resultList.add(app);
+
+					File inputArgsArrayHeadFile = (new File(currentDir, inputArgsArray[0]));
+					if (inputArgsArrayHeadFile.isFile()) {
+
+						List<T> retAppList = App.dispatch(inputArgsArray, currentDir, ret, appClass);
+						for (T retApp : retAppList) {
+							resultList.add(retApp);
+						}
+						
+					} else {
+
+						T app = constructor.newInstance(argFileParent.getAbsolutePath(), inputArgsArray);
+						app.execute();
+						
+						if (ret) {
+							resultList.add(app);
+						}
+						
 					}
 					
 				}
@@ -425,9 +443,6 @@ public class App {
 		try {
 
 			this.mainDirName = this.fmtArgs[0];
-			if (this.mainDirName.contains(".")) {
-				throw new RuntimeException("Can not interpret " + this.mainDirName);
-			}
 			File mainDir = (new File(this.currentDir, this.mainDirName));
 			if (!mainDir.isDirectory()) {
 				throw new RuntimeException("not found directory " + mainDir.getAbsolutePath());
@@ -1214,6 +1229,20 @@ public class App {
 
 	public List<Conf> getSrvList() {
 		return srvList;
+	}
+	
+	private String getEnv() throws IOException {
+		
+		File f = new File(new File("."), "env.txt");
+		if (!f.isFile()) {
+			return "";
+		}
+		BufferedReader reader = new BufferedReader(new FileReader(f));
+		String line = reader.readLine();
+		reader.close();
+		
+		return "." + line;
+		
 	}
 
 }

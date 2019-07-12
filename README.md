@@ -733,5 +733,78 @@ download arg1.txt -> xxxxxxxxxx\sample10\..\sample10_result\server_server1_local
 |       `-- server_server2_local_sample.txt
 ```
 
+*Example11*  
+Switch server definition file  
+Write the server definition file suffix in env.txt  
+Put env.txt at the same hierarchy as com_fairysupport_run.jar  
+
+```
+|-- com_fairysupport_run
+|   |-- com_fairysupport_run.jar
+|   |-- env.txt
+|   |-- server.properties.dev
+|   `-- sample11
+|       `-- main.sh
+```
+
+env.txt 
+
+```
+dev
+
+```
+
+server.properties.dev 
+
+```
+server1.address=127.0.0.2
+server1.port=22
+server1.keyPath=/path/id_rsa
+server2.address=127.0.0.3
+server2.port=22
+
+```
+
+main.sh
+
+```
+#!/bin/bash
+
+echo "Hello world"
+
+for param in $*
+do
+    echo "${param}"
+done
+
+```
+
+```
+java -jar com_fairysupport_run.jar sample11 arg1 arg2
+
+-----------------------------------------------------------------------------------------------------------------------
+[start][127.0.0.3:22]
+....
+[run main.sh][127.0.0.3:22]
+cd /home/user1/com_fairysupport_run/sample11 && ./main.sh arg1 arg2
+Hello world
+arg1
+arg2
+....
+[end][127.0.0.3:22]
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+[start][127.0.0.2:22]
+....
+[run main.sh][127.0.0.2:22]
+cd /home/user1/com_fairysupport_run/sample11 && ./main.sh arg1 arg2
+Hello world
+arg1
+arg2
+....
+[end][127.0.0.2:22]
+-----------------------------------------------------------------------------------------------------------------------
+```
+
 ## License
 MIT

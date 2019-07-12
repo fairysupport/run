@@ -50,6 +50,10 @@ public class App {
 	private static final String GET_LIST_FILE = "get.txt";
 	private static final String ROOT_DIR = "com_fairysupport_run";
 
+	private static final String ENV_FILE = "env.txt";
+	private static String ENV_NAME = null;
+	private static String PROP_SUFFIX = null;
+	
 	private boolean keygenerateOpFlg = false;
 	
 	private static Date NOW = null;
@@ -95,8 +99,6 @@ public class App {
 			
 			List<String> argList = new ArrayList<String>();
 			
-			String propSuffix = this.getEnv();
-
 			String arg = null;
 			boolean fOpFlg = false;
 			boolean iOpFlg = false;
@@ -115,7 +117,7 @@ public class App {
 					String argPropFileName = rawArgs[i + 1];
 					String[] propFileNameSplit = argPropFileName.split(",");
 					for (String propFileName : propFileNameSplit) {
-						propFileNameList.add(propFileName + propSuffix);
+						propFileNameList.add(propFileName + PROP_SUFFIX);
 					}
 					fOpFlg = true;
 				} else if ("-i".equals(arg) && (i + 1) < rawArgs.length) {
@@ -132,7 +134,7 @@ public class App {
 						if ("".equals(line.trim())) {
 							continue;
 						}
-						propFileNameList.add(line.trim() + propSuffix);
+						propFileNameList.add(line.trim() + PROP_SUFFIX);
 					}
 					reader.close();
 					iOpFlg = true;
@@ -143,7 +145,7 @@ public class App {
 					String argOutputFileName = rawArgs[i + 1];
 					String[] argOutputFileNameSplit = argOutputFileName.split(",");
 					for (String outputFileName : argOutputFileNameSplit) {
-						outputFileNameList.add(outputFileName + propSuffix);
+						outputFileNameList.add(outputFileName + PROP_SUFFIX);
 					}
 					oOpFlg = true;
 				} else if ("--keygenerate".equals(arg)) {
@@ -153,7 +155,7 @@ public class App {
 			}
 			
 			if (propFileNameList.size() == 0) {
-				propFileNameList.add(PROP_FILE_NAME + propSuffix);
+				propFileNameList.add(PROP_FILE_NAME + PROP_SUFFIX);
 			}
 			
 			this.fmtArgs = argList.toArray(new String[argList.size()]);
@@ -325,6 +327,10 @@ public class App {
 		
 		try {
 
+			if (ENV_NAME == null) {
+				readEnv();
+			}
+			
 			if (args.length < 1) {
 				System.out.println("Please input directory name or file name");
 				BufferedReader runReader = new BufferedReader(new InputStreamReader(System.in));
@@ -370,6 +376,7 @@ public class App {
 					line = getArgReplace("HH", hFmt.format(NOW), line);
 					line = getArgReplace("MM", mFmt.format(NOW), line);
 					line = getArgReplace("SS", sFmt.format(NOW), line);
+					line = getArgReplace("ENV", ENV_NAME, line);
 
 					String[] inputArgsArray = stringToArray(line);
 					
@@ -684,6 +691,7 @@ public class App {
 				line = getArgReplace("HH", hFmt.format(NOW), line);
 				line = getArgReplace("MM", mFmt.format(NOW), line);
 				line = getArgReplace("SS", sFmt.format(NOW), line);
+				line = getArgReplace("ENV", ENV_NAME, line);
 
 				File includeFile = new File(mainDir, line.trim());
 				if (!includeFile.isDirectory()) {
@@ -1055,6 +1063,7 @@ public class App {
 		from = getArgReplace("HH", hFmt.format(NOW), from);
 		from = getArgReplace("MM", mFmt.format(NOW), from);
 		from = getArgReplace("SS", sFmt.format(NOW), from);
+		from = getArgReplace("ENV", ENV_NAME, from);
 
 		to = getArgReplace(this.fmtArgs, to);
 		to = getArgReplace("FILE", serverFile, to);
@@ -1063,6 +1072,7 @@ public class App {
 		to = getArgReplace("HH", hFmt.format(NOW), to);
 		to = getArgReplace("MM", mFmt.format(NOW), to);
 		to = getArgReplace("SS", sFmt.format(NOW), to);
+		to = getArgReplace("ENV", ENV_NAME, to);
 		
 		this.getFile(sftp, from, to);
 
@@ -1231,17 +1241,22 @@ public class App {
 		return srvList;
 	}
 	
-	private String getEnv() throws IOException {
+	private static void readEnv() throws IOException {
 		
-		File f = new File(new File("."), "env.txt");
+		File f = new File(new File("."), ENV_FILE);
 		if (!f.isFile()) {
-			return "";
+			ENV_NAME = "";
+			PROP_SUFFIX = "";
+			return;
 		}
 		BufferedReader reader = new BufferedReader(new FileReader(f));
 		String line = reader.readLine();
 		reader.close();
+
+		ENV_NAME = line;
+		PROP_SUFFIX = "." + line;
 		
-		return "." + line;
+		return;
 		
 	}
 

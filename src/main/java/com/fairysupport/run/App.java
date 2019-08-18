@@ -620,10 +620,20 @@ public class App {
 
 				JSch jsch = new JSch();
 				if (conf.getKeyPath() != null && !conf.getKeyPath().trim().equals("")) {
+
+					String keyPath = conf.getKeyPath();
+					File fullKeyPathFile = new File(conf.getKeyPath());
+					File relKeyPathFile = new File(this.currentDir, conf.getKeyPath());
+					if (fullKeyPathFile.isFile()) {
+						keyPath = fullKeyPathFile.getAbsolutePath();
+					} else if (relKeyPathFile.isFile()) {
+						keyPath = relKeyPathFile.getAbsolutePath();
+					}
+					
 					if (passphrase != null && !passphrase.trim().equals("")) {
-						jsch.addIdentity(conf.getKeyPath(), passphrase);
+						jsch.addIdentity(keyPath, passphrase);
 					} else {
-						jsch.addIdentity(conf.getKeyPath());
+						jsch.addIdentity(keyPath);
 					}
 				}
 				session = jsch.getSession(user, conf.getAddress(), Integer.parseInt(conf.getPort()));

@@ -745,6 +745,27 @@ public class App {
 
 		try {
 
+			SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
+			SimpleDateFormat hFmt = new SimpleDateFormat("HH");
+			SimpleDateFormat mFmt = new SimpleDateFormat("mm");
+			SimpleDateFormat sFmt = new SimpleDateFormat("ss");
+
+			String serverFile = conf.getFile().split("\\.")[0];
+			
+			String shArg = null;
+			if (this.mainShArg != null) {
+				shArg = this.mainShArg;
+
+				shArg = getArgReplace("FILE", serverFile, shArg);
+				shArg = getArgReplace("SERVER", conf.getServer(), shArg);
+				shArg = getArgReplace("DATE", dateFmt.format(NOW), shArg);
+				shArg = getArgReplace("HH", hFmt.format(NOW), shArg);
+				shArg = getArgReplace("MM", mFmt.format(NOW), shArg);
+				shArg = getArgReplace("SS", sFmt.format(NOW), shArg);
+				shArg = getArgReplace("ENV", ENV_NAME, shArg);
+
+			}
+			
 			StringBuilder sb = new StringBuilder();
 			sb.append("cd ");
 			sb.append("/home/");
@@ -757,7 +778,7 @@ public class App {
 			sb.append(MAIN_SH);
 			if (this.mainShArg != null) {
 				sb.append(" ");
-				sb.append(this.mainShArg);
+				sb.append(shArg);
 			}
 			this.run(session, conf, sb.toString());
 

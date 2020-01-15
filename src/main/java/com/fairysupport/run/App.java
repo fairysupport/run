@@ -344,7 +344,10 @@ public class App {
 			if (currentDir == null) {
 				currentDir = (new File(".")).getCanonicalFile().getAbsolutePath();
 			}
-			File argFile = (new File(currentDir, useArgs[0]));
+			File argFile = (new File(currentDir, useArgs[0] + PROP_SUFFIX));
+			if (!argFile.isFile()) {
+				argFile = (new File(currentDir, useArgs[0]));
+			}
 			if (argFile.isFile()) {
 
 				File argFileParent = argFile.getParentFile();
@@ -383,7 +386,10 @@ public class App {
 					Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
 					
 
-					File inputArgsArrayHeadFile = (new File(currentDir, inputArgsArray[0]));
+					File inputArgsArrayHeadFile = (new File(currentDir, inputArgsArray[0] + PROP_SUFFIX));
+					if (!inputArgsArrayHeadFile.isFile()) {
+						inputArgsArrayHeadFile = (new File(currentDir, inputArgsArray[0]));
+					}
 					if (inputArgsArrayHeadFile.isFile()) {
 
 						List<T> retAppList = App.dispatch(inputArgsArray, currentDir, ret, appClass);
@@ -1281,7 +1287,7 @@ public class App {
 			return;
 		}
 		BufferedReader reader = new BufferedReader(new FileReader(f));
-		String line = reader.readLine();
+		String line = reader.readLine().trim();
 		reader.close();
 
 		ENV_NAME = line;

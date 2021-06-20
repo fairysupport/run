@@ -53,17 +53,17 @@ public class App {
 	private static final String ENV_FILE = "env.txt";
 	private static String ENV_NAME = null;
 	private static String PROP_SUFFIX = null;
-	
+
 	private boolean keygenerateOpFlg = false;
-	
+
 	private static Date NOW = null;
 
 	private static final int RETRY = 10;
-	
+
 	private String keyFileName = null;
 	private List<String> outputFileNameList = new ArrayList<String>();
 	private List<String> propFileNameList = new ArrayList<String>();
-	
+
 	protected String currentDir;
 	private String mainDirName;
 	private String mainShArg;
@@ -75,13 +75,13 @@ public class App {
 
 	protected BufferedReader in;
 	protected PrintStream out;
-	
+
 	private final String SEPARATOR = "-----------------------------------------------------------------------------------------------------------------------";
 
 	public App(String currentDir, String[] rawArgs) {
-		
+
 		try {
-			
+
 			this.init();
 
 			if (this.in == null) {
@@ -96,9 +96,9 @@ public class App {
 			} else {
 				this.currentDir = currentDir;
 			}
-			
+
 			List<String> argList = new ArrayList<String>();
-			
+
 			String arg = null;
 			boolean fOpFlg = false;
 			boolean iOpFlg = false;
@@ -153,13 +153,13 @@ public class App {
 					return;
 				}
 			}
-			
+
 			if (propFileNameList.size() == 0) {
 				propFileNameList.add(PROP_FILE_NAME + PROP_SUFFIX);
 			}
-			
+
 			this.fmtArgs = argList.toArray(new String[argList.size()]);
-			
+
 			Dec dec = null;
 			if (keyFileName != null) {
 				File keyFile = new File(this.currentDir, keyFileName);
@@ -208,14 +208,14 @@ public class App {
 			}
 
 			for (String propFileName : propFileNameList) {
-			
+
 				String propFilePath = (new File(this.currentDir, propFileName)).getCanonicalFile().getCanonicalPath();
-	
+
 				BufferedReader reader = new BufferedReader(new FileReader(propFilePath));
 				Properties props = new Properties();
 				props.load(reader);
 				reader.close();
-	
+
 				Set<Object> keys = props.keySet();
 				String strKey = null;
 				String[] strKeySplit = null;
@@ -236,7 +236,7 @@ public class App {
 						srvList.add(addConf);
 						srvMap.put(serverName, srvList.size() - 1);
 					}
-	
+
 					conf = srvList.get(srvMap.get(serverName));
 					if (dec != null && ("password".equals(strKeySplit[1]) || "passphrase".equals(strKeySplit[1]))) {
 						confValue = dec.decrypto(props.getProperty(strKey));
@@ -244,9 +244,9 @@ public class App {
 						confValue = props.getProperty(strKey);
 					}
 					PropertyUtils.setProperty(conf, strKeySplit[1], confValue == null ? "" : confValue);
-	
+
 				}
-				
+
 			}
 
 		} catch (Exception e) {
@@ -254,19 +254,19 @@ public class App {
 		}
 
 	}
-	
+
 
 	public static void main(String[] args) {
 		App.dispatch(args, null, false, App.class);
 		System.exit(0);
 	}
-	
+
 	private static String[] stringToArray(String runArg) {
 
 		String[] runArgArray = runArg.split(" ");
-		
+
 		String[] useArgs = null;
-		
+
 		List<String> inputArgsList = new ArrayList<String>();
 		String runArgSplit = null;
 		for (int i = 0; i < runArgArray.length; i++) {
@@ -275,7 +275,7 @@ public class App {
 				continue;
 			}
 			String userArg = runArgSplit;
-			
+
 			if (runArgSplit.startsWith("\"")) {
 				StringBuilder userArgSb = new StringBuilder();
 				userArgSb.append(runArgSplit.substring(1));
@@ -298,20 +298,20 @@ public class App {
 				userArg = userArgSb.toString();
 				userArg = userArg.replace("\\\"", "\"");
 			}
-			
+
 			inputArgsList.add(userArg);
-			
+
 		}
 		useArgs = inputArgsList.toArray(new String[inputArgsList.size()]);
-		
+
 		return useArgs;
-		
+
 	}
 
 	public static <T extends App> List<T> dispatch(String[] args, String currentDir, boolean ret, Class<T> appClass) {
 
 		List<T> resultList = new ArrayList<T>();
-		
+
 		BufferedReader reader = null;
 		String[] useArgs = null;
 
@@ -324,13 +324,13 @@ public class App {
 		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
 		SimpleDateFormat mFmt = new SimpleDateFormat("mm");
 		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
-		
+
 		try {
 
 			if (ENV_NAME == null) {
 				readEnv();
 			}
-			
+
 			if (args.length < 1) {
 				System.out.println("Please input directory name or file name");
 				BufferedReader runReader = new BufferedReader(new InputStreamReader(System.in));
@@ -340,7 +340,7 @@ public class App {
 			} else {
 				useArgs = args;
 			}
-			
+
 			if (currentDir == null) {
 				currentDir = (new File(".")).getCanonicalFile().getAbsolutePath();
 			}
@@ -351,7 +351,7 @@ public class App {
 			if (argFile.isFile()) {
 
 				File argFileParent = argFile.getParentFile();
-				
+
 				reader = new BufferedReader(new FileReader(argFile));
 				String line = null;
 				while ((line = reader.readLine()) != null) {
@@ -359,13 +359,13 @@ public class App {
 					if ("".equals(line) || line.startsWith("#")) {
 						continue;
 					}
-					
+
 					validateArg(useArgs, line);
 
 				}
 				reader.close();
-				
-				
+
+
 				reader = new BufferedReader(new FileReader(argFile));
 				line = null;
 				while ((line = reader.readLine()) != null) {
@@ -382,9 +382,9 @@ public class App {
 					line = getArgReplace("ENV", ENV_NAME, line);
 
 					String[] inputArgsArray = stringToArray(line);
-					
+
 					Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
-					
+
 
 					File inputArgsArrayHeadFile = (new File(currentDir, inputArgsArray[0] + PROP_SUFFIX));
 					if (!inputArgsArrayHeadFile.isFile()) {
@@ -396,21 +396,21 @@ public class App {
 						for (T retApp : retAppList) {
 							resultList.add(retApp);
 						}
-						
+
 					} else {
 
 						T app = constructor.newInstance(argFileParent.getAbsolutePath(), inputArgsArray);
 						app.execute();
-						
+
 						if (ret) {
 							resultList.add(app);
 						}
-						
+
 					}
-					
+
 				}
 				reader.close();
-				
+
 			} else {
 
 				Constructor<T> constructor = appClass.getConstructor(String.class, String[].class);
@@ -420,16 +420,16 @@ public class App {
 				if (ret) {
 					resultList.add(app);
 				}
-				
+
 			}
 
 		} catch (Exception e) {
-			
+
 			Throwable target = e;
 			if (e instanceof InvocationTargetException) {
 				target = ((InvocationTargetException)e).getTargetException();
 			}
-			
+
 			if (reader != null) {
 				try {
 					reader.close();
@@ -444,7 +444,7 @@ public class App {
 			System.err.println(target.getMessage());
 			System.exit(1);
 		}
-		
+
 		return resultList;
 
 	}
@@ -452,7 +452,7 @@ public class App {
 	private void validate(List<String> propFileNameList) {
 
 		BufferedReader reader = null;
-		
+
 		try {
 
 			this.mainDirName = this.fmtArgs[0];
@@ -492,7 +492,7 @@ public class App {
 	}
 
 	public void execute() throws NoSuchAlgorithmException, IOException, SftpException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
-		
+
 
 		if (outputFileNameList.size() > 0) {
 			this.encrypt();
@@ -514,21 +514,21 @@ public class App {
 		try {
 
 			for (Conf conf : srvList) {
-	
+
 				this.out.println(SEPARATOR);
 				this.printPoint("start", conf);
-	
+
 				session = this.getSesseion(conf);
-	
+
 				this.start(session, conf);
 				this.run(session, conf);
 				this.end(session, conf);
-	
+
 				this.printPoint("end", conf);
 				this.out.println(SEPARATOR);
-	
+
 			}
-			
+
 		} finally {
 
 			if (session != null) {
@@ -539,23 +539,23 @@ public class App {
 				in.close();
 			} catch (IOException e) {
 			}
-			
+
 		}
 
 	}
-	
+
 	private void encrypt() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, IOException, IllegalBlockSizeException, BadPaddingException {
-		
+
 		String propFileName = null;
 		String outputFileName = null;
-		
+
 		Enc enc = new Enc(this.keyFileName);
 
 		for (int i = 0; i < propFileNameList.size(); i++) {
-			
+
 			propFileName = propFileNameList.get(i);
 			outputFileName = outputFileNameList.get(i);
-			
+
 			String propFilePath = (new File(this.currentDir, propFileName)).getCanonicalFile().getCanonicalPath();
 
 			BufferedReader reader = new BufferedReader(new FileReader(propFilePath));
@@ -574,7 +574,7 @@ public class App {
 				if (strKeySplit.length != 2) {
 					throw new RuntimeException("wrong key " + propFileName + "." + strKey);
 				}
-				
+
 				if ("password".equals(strKeySplit[1]) || "passphrase".equals(strKeySplit[1])) {
 					newProps.setProperty(strKey, enc.encrypto(props.getProperty(strKey)));
 				} else {
@@ -591,7 +591,7 @@ public class App {
 		}
 
 	}
-	
+
 	private Session getSesseion(Conf conf) {
 
 		Session session = null;
@@ -635,7 +635,7 @@ public class App {
 					} else if (relKeyPathFile.isFile()) {
 						keyPath = relKeyPathFile.getAbsolutePath();
 					}
-					
+
 					if (passphrase != null && !passphrase.trim().equals("")) {
 						jsch.addIdentity(keyPath, passphrase);
 					} else {
@@ -662,7 +662,7 @@ public class App {
 			}
 
 		}
-		
+
 		if (!successFlg) {
 			throw new RuntimeException("can not connect " + conf.getAddress() + ":" + conf.getPort());
 		}
@@ -681,7 +681,7 @@ public class App {
 		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
 
 		String serverFile = conf.getFile().split("\\.")[0];
-		
+
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
 		sb.append("/");
@@ -715,20 +715,20 @@ public class App {
 					sftp.disconnect();
 					throw new RuntimeException(INCLUDE_LIST_FILE + " : not found directory " + includeFile.getAbsolutePath());
 				}
-				
+
 				this.upDir(sftp, includeFile, sb.toString());
 			}
 			reader.close();
 		}
 
 		this.upDir(sftp, mainDir, sb.toString());
-		
+
 		sftp.disconnect();
 
 	}
 
 	private void end(Session session, Conf conf) throws SftpException {
-		
+
 		StringBuilder sb = new StringBuilder();
 		sb.append("/home");
 		sb.append("/");
@@ -740,9 +740,9 @@ public class App {
 		sftp.cd(sb.toString());
 		this.printPoint("delete file", conf);
 		this.rmdir(sftp, ROOT_DIR, sb.toString());
-		
+
 		sftp.disconnect();
-		
+
 	}
 
 	private void run(Session session, Conf conf) {
@@ -757,7 +757,7 @@ public class App {
 			SimpleDateFormat sFmt = new SimpleDateFormat("ss");
 
 			String serverFile = conf.getFile().split("\\.")[0];
-			
+
 			String shArg = null;
 			if (this.mainShArg != null) {
 				shArg = this.mainShArg;
@@ -771,7 +771,7 @@ public class App {
 				shArg = getArgReplace("ENV", ENV_NAME, shArg);
 
 			}
-			
+
 			StringBuilder sb = new StringBuilder();
 			sb.append("cd ");
 			sb.append("/home/");
@@ -799,7 +799,7 @@ public class App {
 		try {
 
 			Channel channel = null;
-			
+
 			for (int i = 0; i < RETRY; i++) {
 				try {
 					channel = session.openChannel("exec");
@@ -853,11 +853,11 @@ public class App {
 		}
 
 	}
-	
+
 	private ChannelSftp getSftp(Session session, Conf conf) {
 
 		ChannelSftp sftp = null;
-		
+
 		for (int i = 0; i < RETRY; i++) {
 			try {
 				sftp = (ChannelSftp) session.openChannel("sftp");
@@ -869,9 +869,9 @@ public class App {
 		}
 
 		return sftp;
-		
+
 	}
-	
+
 	private void retry(int i, Conf conf, Exception e, boolean inputFlg) {
 
 		if (i >= (RETRY - 1)) {
@@ -964,7 +964,7 @@ public class App {
 		sb.append("/");
 		int remoteFilePreLen = sb.length();
 		String remoteFile = null;
-		
+
 		@SuppressWarnings("unchecked")
 		Vector<LsEntry> lsList = sftp.ls(targetDir);
 		for (LsEntry child : lsList) {
@@ -1017,7 +1017,7 @@ public class App {
 		String from = null;
 		String to = null;
 		int lineNo = 0;
-		
+
 		try {
 
 			File getListFile = new File(mainDir, GET_LIST_FILE);
@@ -1032,9 +1032,9 @@ public class App {
 				sb.append(ROOT_DIR);
 				sb.append("/");
 				sb.append(this.mainDirName);
-				
+
 				sftp.cd(sb.toString());
-				
+
 				reader = new BufferedReader(new FileReader(getListFile));
 				String line = null;
 				String[] lineSplit = null;
@@ -1064,14 +1064,14 @@ public class App {
 			}
 
 		} catch (Exception e) {
-			
+
 			String msg = e.getMessage();
 			if (e instanceof SftpException) {
 				if (msg.endsWith("No such file")) {
 					msg = GET_LIST_FILE + " line:" + lineNo + " " + e.getMessage();
 				}
 			}
-			
+
 			if (reader != null) {
 				try {
 					reader.close();
@@ -1081,18 +1081,18 @@ public class App {
 			}
 			throw new RuntimeException(msg, e);
 		}
-		
+
 	}
 
 	private void getFile(ChannelSftp sftp, Conf conf, String from, String to) throws Exception {
-		
+
 		SimpleDateFormat dateFmt = new SimpleDateFormat("yyyyMMdd");
 		SimpleDateFormat hFmt = new SimpleDateFormat("HH");
 		SimpleDateFormat mFmt = new SimpleDateFormat("mm");
 		SimpleDateFormat sFmt = new SimpleDateFormat("ss");
-		
+
 		String serverFile = conf.getFile().split("\\.")[0];
-		
+
 		from = getArgReplace(this.fmtArgs, from);
 		from = getArgReplace("FILE", serverFile, from);
 		from = getArgReplace("SERVER", conf.getServer(), from);
@@ -1110,20 +1110,20 @@ public class App {
 		to = getArgReplace("MM", mFmt.format(NOW), to);
 		to = getArgReplace("SS", sFmt.format(NOW), to);
 		to = getArgReplace("ENV", ENV_NAME, to);
-		
+
 		this.getFile(sftp, from, to);
 
 	}
 
 	private void getFile(ChannelSftp sftp, String from, String to) throws SftpException {
-		
+
 		try {
 
 			String preMsg = GET_LIST_FILE + " : ";
-			
+
 			boolean loopExists = false;
 			boolean getSuccess = false;
-			
+
 			@SuppressWarnings("unchecked")
 			Vector<LsEntry> lsList = sftp.ls(from);
 			for (LsEntry child : lsList) {
@@ -1134,45 +1134,45 @@ public class App {
 				if (child.getAttrs().isDir()) {
 					this.getFile(sftp, from + "/" + child.getFilename(), to + File.separator + child.getFilename());
 				} else {
-					
+
 					String fromFileName = from;
 					String toFileName = to;
 					if (lsList.size() > 1) {
 						fromFileName = from + "/" + child.getFilename();
 						toFileName = to + "/" + child.getFilename();
 					}
-	
+
 					File mainDir = new File(this.currentDir, this.mainDirName);
 					File toFile = new File(mainDir, toFileName);
-					
+
 					this.out.print("download ");
 					this.out.print(fromFileName);
 					this.out.print(" -> ");
 					this.out.println(toFile.getAbsolutePath());
-					
+
 					if (toFile.isFile() || toFile.isDirectory()) {
 						throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
 					}
-	
+
 					this.localMkdir(toFile, preMsg);
-					
+
 					try {
 						sftp.get(fromFileName, toFile.getAbsolutePath());
 					} catch (Exception e) {
 						throw new RuntimeException(preMsg + e.getMessage(), e);
 					}
-					
+
 				}
 				getSuccess = true;
-				
+
 			}
-			
+
 			if (loopExists && !getSuccess) {
-	
+
 				File mainDir = new File(this.currentDir, this.mainDirName);
 				File toFile = new File(mainDir, to);
 				this.localMkdir(toFile, preMsg);
-	
+
 				if (toFile.isFile() || toFile.isDirectory()) {
 					throw new RuntimeException(preMsg + "already exists : " + toFile.getAbsolutePath());
 				}
@@ -1180,16 +1180,16 @@ public class App {
 				if (!mkRet) {
 					throw new RuntimeException(preMsg + "Can not mkdir : " + toFile.getAbsolutePath());
 				}
-				
+
 			}
-			
+
 		} catch (SftpException e) {
 
 			String msg = e.getMessage();
 			if ("No such file".equals(msg)) {
 				msg = from + " : " + e.getMessage();
 			}
-			
+
 			String eStr = e.toString();
 			String[] eStrSplit = eStr.split(":");
 			int id = 0;
@@ -1204,7 +1204,7 @@ public class App {
 	}
 
 	private void localMkdir(File f, String preMsg) {
-		
+
 		File p = f.getParentFile();
 		if (p.isFile()) {
 			throw new RuntimeException(preMsg + "Not a directory : " + p.getAbsolutePath());
@@ -1215,7 +1215,7 @@ public class App {
 				throw new RuntimeException(preMsg + "Can not mkdir : " + p.getAbsolutePath());
 			}
 		}
-		
+
 	}
 
 	private static String getArgReplace(String[] args, String target) {
@@ -1227,14 +1227,14 @@ public class App {
 
 	private static String getArgReplace(String arg, String replace, String target) {
 		target = target.replaceAll("(?<!\\\\)\\$\\{" + arg + "\\}", replace);
-		target = target.replace("\\${" + arg + "}", "${" + replace + "}");
+		target = target.replace("\\${" + arg + "}", "${" + arg + "}");
 		return target;
 	}
 
 	private static void validateArg(String[] args, String target) {
 
 		StringBuilder sb = new StringBuilder();
-		
+
 		String regexp = "(?<!\\\\)\\$\\{[1-9][0-9]*\\}";
 		Pattern pt = Pattern.compile(regexp);
 		Matcher m = pt.matcher(target);
@@ -1255,13 +1255,13 @@ public class App {
 				sb.append(grp);
 			}
 		}
-		
+
 		if (sb.length() > 0) {
 			throw new RuntimeException("Please input argument " + sb.toString());
 		}
-		
+
 	}
-	
+
 	private void printPoint(String pointName, Conf conf) {
 
 		this.out.print("[");
@@ -1277,9 +1277,9 @@ public class App {
 	public List<Conf> getSrvList() {
 		return srvList;
 	}
-	
+
 	private static void readEnv() throws IOException {
-		
+
 		File f = new File(new File("."), ENV_FILE);
 		if (!f.isFile()) {
 			ENV_NAME = "";
@@ -1292,9 +1292,9 @@ public class App {
 
 		ENV_NAME = line;
 		PROP_SUFFIX = "." + line;
-		
+
 		return;
-		
+
 	}
 
 }
